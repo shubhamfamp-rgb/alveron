@@ -1,0 +1,497 @@
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import type {
+  AdSlot,
+  Order,
+  PriceAlert,
+  Product,
+  ShopifyConfig,
+} from '../src/types.ts';
+
+export interface StoredUser {
+  id: string;
+  email: string;
+  name: string;
+  provider: 'email' | 'google' | 'apple' | 'github';
+  passwordHash?: string;
+  passwordSalt?: string;
+  wishlistIds: string[];
+  createdAt: string;
+}
+
+export interface AlveronDatabase {
+  products: Product[];
+  adSlots: AdSlot[];
+  orders: Order[];
+  priceAlerts: PriceAlert[];
+  shopify: ShopifyConfig;
+  users: StoredUser[];
+  pushHistory: {
+    id: string;
+    title: string;
+    message: string;
+    productId?: string;
+    createdAt: string;
+  }[];
+}
+
+const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'alveron.json');
+
+const initialProducts: Product[] = [
+  {
+    id: 'alv-air-01',
+    title: 'Alveron Reference Studio Headphones',
+    brand: 'Alveron Acoustics',
+    category: 'Audio',
+    price: 45999,
+    originalPrice: 49999,
+    currency: 'INR',
+    source: 'shopify',
+    externalUrl: 'https://alveron.myshopify.com/products/reference-studio-headphones',
+    externalId: 'shpfy_904182',
+    images: [
+      '/src/assets/images/product_audio_headphones_1795273429944.jpg',
+      '/src/assets/images/hero_alveron_flagship_1795273429946.jpg',
+    ],
+    description:
+      'Machined aerospace-grade titanium headband paired with 45mm planar magnetic drivers and acoustically sealed lambskin cushions for studio-grade spatial clarity.',
+    specs: [
+      '45mm Planar Magnetic Transducers',
+      'Active Spatial Transparency Mode',
+      '42-Hour Lossless USB-C & Wireless Playback',
+      'CNC-Milled Grade 5 Titanium Yokes',
+    ],
+    keywords: ['headphones', 'audio', 'wireless', 'titanium', 'studio', 'noise-cancelling'],
+    stock: 28,
+    sku: 'ALV-AUD-01',
+    createdAt: '2026-10-12T09:00:00.000Z',
+    rating: 4.9,
+    reviewCount: 418,
+    model3D: {
+      shape: 'headphones',
+      primaryColor: '#C9C6BE',
+      secondaryColor: '#2B2D30',
+      accentColor: '#8E8B84',
+      metalness: 0.88,
+      roughness: 0.24,
+      clearcoat: 0.35,
+      finishes: [
+        { name: 'Natural Titanium', hex: '#C9C6BE', metalness: 0.88, roughness: 0.24 },
+        { name: 'Obsidian Slate', hex: '#26282C', metalness: 0.78, roughness: 0.32 },
+        { name: 'Warm Silver', hex: '#E4E2DD', metalness: 0.92, roughness: 0.18 },
+      ],
+      dimensionsLabel: '188 × 162 × 84 mm · 312 g',
+      partsNote: '8-part articulated titanium frame, acoustic grilles & foam cups',
+    },
+  },
+  {
+    id: 'alv-chr-02',
+    title: 'Alveron Chrono Ti-49',
+    brand: 'Alveron Horology',
+    category: 'Wearables',
+    price: 64999,
+    currency: 'INR',
+    source: 'alveron',
+    images: ['/src/assets/images/product_wearable_watch_1795273430221.jpg'],
+    description:
+      'Precision brushed titanium wearable sculpted under a sapphire crystal dome, engineered for multi-day endurance telemetry and seamless tactile crown control.',
+    specs: [
+      '49mm Grade 5 Brushed Titanium Chassis',
+      '2,800-Nit Sapphire Crystal Retina Display',
+      '72-Hour Adaptive Battery Architecture',
+      '100m Water Resistance & Dual-Band GPS',
+    ],
+    keywords: ['watch', 'smartwatch', 'wearable', 'titanium', 'sapphire', 'fitness'],
+    stock: 19,
+    sku: 'ALV-WRB-02',
+    createdAt: '2026-10-18T11:30:00.000Z',
+    rating: 4.9,
+    reviewCount: 286,
+    model3D: {
+      shape: 'watch',
+      primaryColor: '#BFB8AD',
+      secondaryColor: '#4E5864',
+      accentColor: '#D96A3B',
+      metalness: 0.9,
+      roughness: 0.22,
+      clearcoat: 0.8,
+      finishes: [
+        { name: 'Brushed Titanium', hex: '#BFB8AD', metalness: 0.9, roughness: 0.22 },
+        { name: 'Graphite DLC', hex: '#2B2E33', metalness: 0.86, roughness: 0.26 },
+        { name: 'Raw Platinum', hex: '#D8DADF', metalness: 0.94, roughness: 0.15 },
+      ],
+      dimensionsLabel: '49 × 44 × 13.4 mm · 61 g',
+      partsNote: '9-part milled case, sapphire crystal, digital crown & woven loop',
+    },
+  },
+  {
+    id: 'alv-spk-03',
+    title: 'Alveron Monolith Acoustic Cylinder',
+    brand: 'Alveron Acoustics',
+    category: 'Home',
+    price: 32999,
+    originalPrice: 36999,
+    currency: 'INR',
+    source: 'shopify',
+    externalUrl: 'https://alveron.myshopify.com/products/monolith-acoustic-cylinder',
+    externalId: 'shpfy_904215',
+    images: [
+      '/src/assets/images/product_workspace_speaker_1795273429994.jpg',
+      '/src/assets/images/hero_alveron_flagship_1795273429946.jpg',
+    ],
+    description:
+      'Omnidirectional room-calibrating wireless speaker wrapped in acoustic charcoal textile over a machined aluminum base with capacitive touch controls.',
+    specs: [
+      '360° Beamforming Waveguide Array',
+      'Real-Time Room Acoustic Calibration',
+      'Machined Anodized Aluminum Base',
+      'Lossless AirPlay, Wi-Fi 6E & Spatial Stereo Pairing',
+    ],
+    keywords: ['speaker', 'audio', 'home', 'wireless', 'cylinder', 'smart-speaker'],
+    stock: 34,
+    sku: 'ALV-HOM-03',
+    createdAt: '2026-10-22T14:15:00.000Z',
+    rating: 4.8,
+    reviewCount: 194,
+    model3D: {
+      shape: 'speaker',
+      primaryColor: '#2B2D31',
+      secondaryColor: '#9A9EA4',
+      accentColor: '#0071E3',
+      metalness: 0.65,
+      roughness: 0.55,
+      clearcoat: 0.2,
+      finishes: [
+        { name: 'Charcoal & Aluminum', hex: '#2B2D31', metalness: 0.65, roughness: 0.55 },
+        { name: 'Chalk & Silver', hex: '#DFDEDA', metalness: 0.5, roughness: 0.6 },
+        { name: 'Space Titanium', hex: '#5A5D63', metalness: 0.8, roughness: 0.35 },
+      ],
+      dimensionsLabel: '168 × 126 × 126 mm · 2.1 kg',
+      partsNote: '7-part acoustic grille shell, milled base ring & top touch array',
+    },
+  },
+  {
+    id: 'alv-cam-04',
+    title: 'Aeterna RF-1 Milled Rangefinder',
+    brand: 'Aeterna Optics',
+    category: 'Workspace',
+    price: 199990,
+    currency: 'INR',
+    source: 'amazon',
+    externalUrl: 'https://www.amazon.com/dp/B0ALVERONRF1',
+    externalId: 'B0ALVERONRF1',
+    images: ['/src/assets/images/product_camera_optic_1795273429767.jpg'],
+    description:
+      'Full-frame 47MP rangefinder milled from a solid billet of anodized aluminum, featuring a precision 35mm f/2.0 apochromatic lens and tactile knurled dials.',
+    specs: [
+      '47.3MP Full-Frame Backside-Illuminated Sensor',
+      '35mm f/2.0 ASPH Apochromatic Fixed Optic',
+      'CNC Solid Billet Silver Aluminum Top Plate',
+      '14-Bit Raw DNG + ProRes USB-C Direct Workflow',
+    ],
+    keywords: ['camera', 'optics', 'photography', 'rangefinder', 'aluminum', 'workspace'],
+    stock: 7,
+    sku: 'ALV-OPT-04',
+    createdAt: '2026-11-01T10:00:00.000Z',
+    rating: 5.0,
+    reviewCount: 92,
+    model3D: {
+      shape: 'camera',
+      primaryColor: '#D4D6D9',
+      secondaryColor: '#1E2024',
+      accentColor: '#C43E2B',
+      metalness: 0.92,
+      roughness: 0.2,
+      clearcoat: 0.4,
+      finishes: [
+        { name: 'Silver Anodized', hex: '#D4D6D9', metalness: 0.92, roughness: 0.2 },
+        { name: 'Stealth Matte Black', hex: '#1E2024', metalness: 0.72, roughness: 0.38 },
+        { name: 'Titanium Heritage', hex: '#ABA79E', metalness: 0.9, roughness: 0.24 },
+      ],
+      dimensionsLabel: '139 × 80 × 38 mm · 585 g',
+      partsNote: '10-part billet body, optical glass lens barrel, shutter & ISO dials',
+    },
+  },
+  {
+    id: 'alv-lmp-05',
+    title: 'Alveron Cantilever Task Light',
+    brand: 'Alveron Atelier',
+    category: 'Workspace',
+    price: 24999,
+    originalPrice: 28999,
+    currency: 'INR',
+    source: 'flipkart',
+    externalUrl: 'https://www.flipkart.com/alveron-cantilever-task-light/p/itm99281',
+    externalId: 'FLK-99281-LMP',
+    images: ['/src/assets/images/product_desk_lamp_1795273430038.jpg'],
+    description:
+      'Counterbalanced architectural desk luminaire with friction-damped aluminum hinges, woven braided cable, and CRI 98+ circadian stepless dimming.',
+    specs: [
+      'CRI 98+ Full-Spectrum Flicker-Free LED',
+      '2700K–5500K Stepless Rotary Dimmer Dial',
+      'Precision-Machined Dual Pivot Hinges',
+      'Weighted Brushed Aluminum Desk Base',
+    ],
+    keywords: ['lamp', 'lighting', 'desk', 'workspace', 'aluminum', 'minimalist'],
+    stock: 42,
+    sku: 'ALV-WKS-05',
+    createdAt: '2026-11-05T16:40:00.000Z',
+    rating: 4.8,
+    reviewCount: 153,
+    model3D: {
+      shape: 'lamp',
+      primaryColor: '#C8CBCE',
+      secondaryColor: '#565A60',
+      accentColor: '#FFE8B8',
+      metalness: 0.88,
+      roughness: 0.22,
+      clearcoat: 0.25,
+      finishes: [
+        { name: 'Brushed Aluminum', hex: '#C8CBCE', metalness: 0.88, roughness: 0.22 },
+        { name: 'Anodized Graphite', hex: '#383B40', metalness: 0.82, roughness: 0.3 },
+        { name: 'Warm Champagne', hex: '#D8CEBF', metalness: 0.88, roughness: 0.24 },
+      ],
+      dimensionsLabel: '480 × 160 × 520 mm · 1.85 kg',
+      partsNote: '8-part weighted base, rotary dial, articulated arms & LED bar',
+    },
+  },
+  {
+    id: 'alv-duo-06',
+    title: 'Alveron Acoustic Studio Bundle',
+    brand: 'Alveron Acoustics',
+    category: 'Accessories',
+    price: 71999,
+    originalPrice: 79999,
+    currency: 'INR',
+    source: 'shopify',
+    externalUrl: 'https://alveron.myshopify.com/products/acoustic-studio-bundle',
+    externalId: 'shpfy_904490',
+    images: [
+      '/src/assets/images/hero_alveron_flagship_1795273429946.jpg',
+      '/src/assets/images/product_audio_headphones_1795273429944.jpg',
+      '/src/assets/images/product_workspace_speaker_1795273429994.jpg',
+    ],
+    description:
+      'Matched studio acoustic pairing combining Alveron Reference Headphones and Monolith Acoustic Cylinder for seamless handoff between personal and room listening.',
+    specs: [
+      'Instant Spatial Audio Handoff',
+      'Matched Natural Titanium & Aluminum Finish',
+      'Braided USB-C Reference Interconnect Included',
+      '2-Year Alveron Care Hardware Coverage',
+    ],
+    keywords: ['headphones', 'speaker', 'audio', 'bundle', 'titanium', 'studio'],
+    stock: 14,
+    sku: 'ALV-BND-06',
+    createdAt: '2026-11-10T08:20:00.000Z',
+    rating: 4.9,
+    reviewCount: 74,
+    model3D: {
+      shape: 'speaker',
+      primaryColor: '#B8B5AD',
+      secondaryColor: '#3B3D42',
+      accentColor: '#0071E3',
+      metalness: 0.9,
+      roughness: 0.22,
+      clearcoat: 0.35,
+      finishes: [
+        { name: 'Titanium Pair', hex: '#B8B5AD', metalness: 0.9, roughness: 0.22 },
+        { name: 'Obsidian Pair', hex: '#282A2E', metalness: 0.82, roughness: 0.32 },
+      ],
+      dimensionsLabel: 'Studio Pair · 2.4 kg combined',
+      partsNote: '7-part matched aluminum acoustic enclosure with studio trim',
+    },
+  },
+];
+
+const initialAdSlots: AdSlot[] = [
+  {
+    id: 'ad-shpfy-1',
+    productId: 'alv-air-01',
+    productTitle: 'Alveron Reference Studio Headphones',
+    productImage: '/src/assets/images/product_audio_headphones_1795273429944.jpg',
+    productPrice: 45999,
+    source: 'shopify',
+    placement: 'sidebar',
+    activeVariant: 'A',
+    autoOptimize: true,
+    variantA: {
+      headline: 'Planar clarity, sculpted in titanium.',
+      subcopy: 'Direct from Shopify inventory — inspect the 360° studio twin now.',
+      cta: 'Explore Reference Audio',
+    },
+    variantB: {
+      headline: 'Save ₹4,000 on Studio Headphones today.',
+      subcopy: '42-hour lossless playback with CNC-milled titanium architecture.',
+      cta: 'Shop Limited Pricing',
+    },
+    stats: {
+      A: { impressions: 1420, clicks: 89 },
+      B: { impressions: 1385, clicks: 112 },
+    },
+    createdAt: '2026-11-01T10:00:00.000Z',
+  },
+  {
+    id: 'ad-shpfy-2',
+    productId: 'alv-spk-03',
+    productTitle: 'Alveron Monolith Acoustic Cylinder',
+    productImage: '/src/assets/images/product_workspace_speaker_1795273429994.jpg',
+    productPrice: 32999,
+    source: 'shopify',
+    placement: 'sidebar',
+    activeVariant: 'B',
+    autoOptimize: true,
+    variantA: {
+      headline: '360° room-adaptive acoustics.',
+      subcopy: 'Automatically calibrated for every architectural surface.',
+      cta: 'View Monolith',
+    },
+    variantB: {
+      headline: 'Fill any room with pure spatial sound.',
+      subcopy: 'Captured live from Alveron Shopify catalog · ₹4,000 off this week.',
+      cta: 'Inspect 3D Model',
+    },
+    stats: {
+      A: { impressions: 980, clicks: 41 },
+      B: { impressions: 1040, clicks: 68 },
+    },
+    createdAt: '2026-11-08T12:00:00.000Z',
+  },
+];
+
+const initialOrders: Order[] = [
+  {
+    id: 'ALV-1042',
+    customerName: 'Elena Vance',
+    customerEmail: 'elena@atelier-vance.co',
+    shippingAddress: '742 Evergreen Terrace, San Francisco, CA 94107',
+    items: [
+      {
+        productId: 'alv-air-01',
+        title: 'Alveron Reference Studio Headphones',
+        price: 45999,
+        quantity: 1,
+        finish: 'Natural Titanium',
+        image: '/src/assets/images/product_audio_headphones_1795273429944.jpg',
+      },
+    ],
+    subtotal: 45999,
+    total: 45999,
+    status: 'synced_to_shopify',
+    shopifyOrderId: '#SHPFY-49821',
+    shopifyStoreUrl: 'https://alveron.myshopify.com',
+    createdAt: '2026-11-20T14:22:00.000Z',
+  },
+];
+
+function createDefaultDb(): AlveronDatabase {
+  const defaultSalt = crypto.randomBytes(16).toString('hex');
+  const defaultHash = crypto.scryptSync('AlveronDemo!2026', defaultSalt, 64).toString('hex');
+  return {
+    products: initialProducts,
+    adSlots: initialAdSlots,
+    orders: initialOrders,
+    priceAlerts: [
+      {
+        id: 'alt-1',
+        productId: 'alv-chr-02',
+        productTitle: 'Alveron Chrono Ti-49',
+        targetPrice: 59999,
+        currentPrice: 64999,
+        email: 'sjaat4859@gmail.com',
+        triggered: false,
+        createdAt: '2026-11-19T10:00:00.000Z',
+      },
+    ],
+    shopify: {
+      storeUrl: 'https://alveron.myshopify.com',
+      connected: true,
+      hasApiToken: Boolean(process.env.SHOPIFY_ACCESS_TOKEN),
+      autoSyncCatalog: true,
+      autoSyncOrders: true,
+      autoCaptureAds: true,
+      lastSyncAt: '2026-11-21T06:45:00.000Z',
+      syncedCount: 3,
+    },
+    users: [
+      {
+        id: 'usr-demo-1',
+        email: 'sjaat4859@gmail.com',
+        name: 'Alveron Founder',
+        provider: 'email',
+        passwordHash: defaultHash,
+        passwordSalt: defaultSalt,
+        wishlistIds: ['alv-air-01', 'alv-cam-04'],
+        createdAt: '2026-11-01T00:00:00.000Z',
+      },
+    ],
+    pushHistory: [],
+  };
+}
+
+let cachedDb: AlveronDatabase | null = null;
+
+export function loadDb(): AlveronDatabase {
+  if (cachedDb) return cachedDb;
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      const parsed = JSON.parse(raw) as AlveronDatabase;
+      // Migrate any legacy USD seeded items to Indian Rupees (INR)
+      let migrated = false;
+      for (const p of parsed.products) {
+        if (p.currency !== 'INR') {
+          p.currency = 'INR';
+          p.price = Math.round(p.price * 84);
+          if (p.originalPrice) p.originalPrice = Math.round(p.originalPrice * 84);
+          migrated = true;
+        }
+      }
+      if (migrated) {
+        for (const ad of parsed.adSlots) {
+          const matched = parsed.products.find((p) => p.id === ad.productId);
+          if (matched) ad.productPrice = matched.price;
+          ad.variantB.headline = ad.variantB.headline.replace('$50', '₹4,000');
+          ad.variantB.subcopy = ad.variantB.subcopy.replace('$40', '₹4,000');
+        }
+        for (const ord of parsed.orders) {
+          ord.subtotal = ord.items.reduce((s, i) => {
+            const matched = parsed.products.find((p) => p.id === i.productId);
+            if (matched) i.price = matched.price;
+            return s + i.price * i.quantity;
+          }, 0);
+          ord.total = ord.subtotal;
+        }
+        for (const alt of parsed.priceAlerts) {
+          const matched = parsed.products.find((p) => p.id === alt.productId);
+          if (matched) {
+            alt.currentPrice = matched.price;
+            alt.targetPrice = Math.max(1000, Math.round(matched.price * 0.92));
+          }
+        }
+        saveDb(parsed);
+      }
+      cachedDb = parsed;
+      return cachedDb;
+    }
+  } catch {
+    // Fallback to clean seed if corrupted
+  }
+  cachedDb = createDefaultDb();
+  saveDb(cachedDb);
+  return cachedDb;
+}
+
+export function saveDb(db: AlveronDatabase): void {
+  cachedDb = db;
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  const tmpFile = `${DB_FILE}.tmp`;
+  fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2), 'utf-8');
+  fs.renameSync(tmpFile, DB_FILE);
+}

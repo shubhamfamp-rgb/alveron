@@ -1,0 +1,11 @@
+{
+  "name": "Alveron",
+  "description": "Minimalist industrial-luxury e-commerce storefront with real-time Shopify sync, AI visual Lens search, interactive 360° 3D product twins, A/B ad analytics, and direct GitHub publishing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
